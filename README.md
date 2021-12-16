@@ -8,9 +8,11 @@ Playing with [SDL](https://www.libsdl.org/).
 The current build configuration is intended to target Windows only (for now).
 ```
 git clone https://github.com/deforde/sdl-test
-cd sdl_test && mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-cmake --build . --target sdl_test
+cd sdl-test
+mkdir build
+cd build
+cmake ..
+cmake --build . --config Release --target ALL_BUILD
 ```
 
 Expects environment variables: `SDL_INCLUDE` and `SDL_LIB` to be defined, and point to the include and lib directories for SDL respectively.
