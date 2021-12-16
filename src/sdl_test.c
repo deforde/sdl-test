@@ -61,8 +61,6 @@ void init()
 
     SDL_RWops* rw = SDL_RWFromConstMem(spaceship_bitmap, sizeof(spaceship_bitmap));
     state.spaceship_surface = SDL_LoadBMP_RW(rw, 1);
-
-    SDL_UpdateWindowSurface(state.window);
 }
 
 void destroy()
