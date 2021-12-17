@@ -4,7 +4,6 @@ project(sdl_test C)
 add_executable(sdl_test "")
 
 add_subdirectory(src)
-add_subdirectory(src/utility)
 
 cmake_path(SET SDL_LIB $ENV{SDL_LIB})
 cmake_path(SET SDL_IMAGE_LIB $ENV{SDL_IMAGE_LIB})
