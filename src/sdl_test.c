@@ -34,6 +34,8 @@ enum {
     SPACESHIP_SPRITES_TOTAL
 };
 
+#define SPACESHIP_VELOCITY_PPS 320
+
 SDL_Rect spaceship_sprite_quads[SPACESHIP_SPRITES_TOTAL];
 
 typedef struct {
@@ -72,6 +74,7 @@ game_state_t state;
 void init();
 void destroy();
 void update_state();
+void handle_event(const SDL_Event* const event);
 void render();
 
 // ============================================================================
@@ -139,7 +142,7 @@ void init()
     state.spaceship.velocity.y = 0;
     state.spaceship.texture = NULL;
     state.spaceship.sprite_quad = NULL;
-    state.spaceship.sprite_scaling = 4;
+    state.spaceship.sprite_scaling = 2;
     state.spaceship.render_quad.x = 0;
     state.spaceship.render_quad.y = 0;
     state.spaceship.render_quad.w = 0;
@@ -207,8 +210,41 @@ void destroy()
     SDL_Quit();
 }
 
+void handle_event(const SDL_Event* const event)
+{
+    // Set the spaceship's velocity
+    if(event->type == SDL_KEYDOWN && event->key.repeat == 0) {
+        switch(event->key.keysym.sym) {
+            case SDLK_UP: state.spaceship.velocity.y -= SPACESHIP_VELOCITY_PPS; break;
+            case SDLK_DOWN: state.spaceship.velocity.y += SPACESHIP_VELOCITY_PPS; break;
+            case SDLK_LEFT: state.spaceship.velocity.x -= SPACESHIP_VELOCITY_PPS; break;
+            case SDLK_RIGHT: state.spaceship.velocity.x += SPACESHIP_VELOCITY_PPS; break;
+        }
+    }
+    else if(event->type == SDL_KEYUP && event->key.repeat == 0) {
+        switch(event->key.keysym.sym) {
+            case SDLK_UP: state.spaceship.velocity.y += SPACESHIP_VELOCITY_PPS; break;
+            case SDLK_DOWN: state.spaceship.velocity.y -= SPACESHIP_VELOCITY_PPS; break;
+            case SDLK_LEFT: state.spaceship.velocity.x += SPACESHIP_VELOCITY_PPS; break;
+            case SDLK_RIGHT: state.spaceship.velocity.x -= SPACESHIP_VELOCITY_PPS; break;
+        }
+    }
+}
+
 void update_state()
 {
+    // Get the time delta since the last update
+    const uint32_t current_time_ms = SDL_GetTicks();
+    static bool time_initialised = false;
+    static uint32_t last_update_time_ms = 0;
+    if(!time_initialised) {
+        last_update_time_ms = current_time_ms;
+        time_initialised = true;
+    }
+    const float time_delta_s = (current_time_ms - last_update_time_ms) / 1000.0F;
+    last_update_time_ms = current_time_ms;
+
+    // Select the correct spaceship sprite and set the rendering quad dimensions accordingly
     state.spaceship.sprite_quad = &spaceship_sprite_quads[SPACESHIP_STATIONARY_1 + state.spaceship.animation_idx];
     if(state.spaceship.velocity.x < 0) {
         state.spaceship.sprite_quad = &spaceship_sprite_quads[SPACESHIP_BANK_HARD_LEFT_1 + state.spaceship.animation_idx];
@@ -216,12 +252,26 @@ void update_state()
     else if(state.spaceship.velocity.x > 0) {
         state.spaceship.sprite_quad = &spaceship_sprite_quads[SPACESHIP_BANK_HARD_RIGHT_1 + state.spaceship.animation_idx];
     }
-
-    state.spaceship.render_quad.x = state.spaceship.position.x - state.spaceship.sprite_quad->w * state.spaceship.sprite_scaling / 2;
-    state.spaceship.render_quad.y = state.spaceship.position.y - state.spaceship.sprite_quad->h * state.spaceship.sprite_scaling / 2;
     state.spaceship.render_quad.w = state.spaceship.sprite_quad->w * state.spaceship.sprite_scaling;
     state.spaceship.render_quad.h = state.spaceship.sprite_quad->h * state.spaceship.sprite_scaling;
 
+    // Update the spaceship's position
+    state.spaceship.position.x += (int32_t)(state.spaceship.velocity.x * time_delta_s);
+    state.spaceship.position.y += (int32_t)(state.spaceship.velocity.y * time_delta_s);
+    const int32_t spaceship_min_x = (state.spaceship.render_quad.w / 2);
+    const int32_t spaceship_max_x = SCREEN_WIDTH - (state.spaceship.render_quad.w / 2);
+    const int32_t spaceship_min_y = (state.spaceship.render_quad.h / 2);
+    const int32_t spaceship_max_y = SCREEN_HEIGHT - (state.spaceship.render_quad.h / 2);
+    state.spaceship.position.x = state.spaceship.position.x < spaceship_min_x ? spaceship_min_x : state.spaceship.position.x;
+    state.spaceship.position.x = state.spaceship.position.x >= spaceship_max_x ? (spaceship_max_x - 1) : state.spaceship.position.x;
+    state.spaceship.position.y = state.spaceship.position.y < spaceship_min_y ? spaceship_min_y : state.spaceship.position.y;
+    state.spaceship.position.y = state.spaceship.position.y >= spaceship_max_y ? (spaceship_max_y - 1) : state.spaceship.position.y;
+
+    // Update the spaceship's rendering quad origin
+    state.spaceship.render_quad.x = state.spaceship.position.x - state.spaceship.render_quad.w / 2;
+    state.spaceship.render_quad.y = state.spaceship.position.y - state.spaceship.render_quad.h / 2;
+
+    // Update the spaceship's animation indices as needed
     ++state.spaceship.rendered_frame_idx;
     if(state.spaceship.rendered_frame_idx == state.spaceship.num_rendered_frames_per_animation_frame) {
         state.spaceship.rendered_frame_idx = 0;
@@ -250,11 +300,15 @@ int main(int argc, char* argv[])
 
     bool running = true;
     SDL_Event event;
+
     while(running) {
         // Poll for events
         while(SDL_PollEvent(&event)) {
             if(event.type == SDL_QUIT) {
                 running = false;
+            }
+            else {
+                handle_event(&event);
             }
         }
 
@@ -263,8 +317,6 @@ int main(int argc, char* argv[])
 
         // Render
         render();
-
-        SDL_Delay(1000 / 60);
     }
 
     destroy();
