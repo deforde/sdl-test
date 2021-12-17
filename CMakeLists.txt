@@ -7,4 +7,5 @@ add_subdirectory(src)
 add_subdirectory(src/utility)
 
 cmake_path(SET SDL_LIB $ENV{SDL_LIB})
-target_link_libraries(sdl_test ${SDL_LIB}/SDL2.lib)
+cmake_path(SET SDL_IMAGE_LIB $ENV{SDL_IMAGE_LIB})
+target_link_libraries(sdl_test ${SDL_LIB}/SDL2.lib ${SDL_IMAGE_LIB}/SDL2_image.lib)
