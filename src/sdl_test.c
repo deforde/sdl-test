@@ -17,7 +17,10 @@
 
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
+
 #define SPACESHIP_VELOCITY_PPS 320
+#define SPACESHIP_FIRERATE_PPS 3
+
 #define MAX_NUM_PROJECTILES 1024
 #define PROJECTILE_VELOCITY_PPS 640
 
@@ -52,26 +55,34 @@ typedef struct {
     int32_t y;
 } vector_t;
 
+#define ENTITY_STRUCT_BODY                              \
+{                                                       \
+    vector_t position;                                  \
+    vector_t velocity;                                  \
+    SDL_Rect* sprite_quad;                              \
+    uint32_t sprite_scaling;                            \
+    SDL_Rect render_quad;                               \
+    int32_t num_animation_frames;                       \
+    int32_t animation_idx;                              \
+    int32_t num_rendered_frames_per_animation_frame;    \
+    int32_t rendered_frame_idx;                         \
+}
+
+typedef struct ENTITY_STRUCT_BODY entity_t;
+
 typedef struct {
-    vector_t position;
-    vector_t velocity;
+    struct ENTITY_STRUCT_BODY;
 
-    SDL_Rect* sprite_quad;
-    uint32_t sprite_scaling;
-    SDL_Rect render_quad;
-
-    int32_t num_animation_frames;
-    int32_t animation_idx;
-    int32_t num_rendered_frames_per_animation_frame;
-    int32_t rendered_frame_idx;
-} entity_t;
+    bool is_firing;
+    float time_till_next_shot_s;
+} spaceship_t;
 
 typedef struct {
     SDL_Window* window;
     SDL_Renderer* renderer;
 
     SDL_Texture* spaceship_texture;
-    entity_t spaceship;
+    spaceship_t spaceship;
 
     SDL_Texture* projectile_texture;
     entity_t projectiles[MAX_NUM_PROJECTILES];
@@ -170,6 +181,8 @@ void init()
     state.spaceship.animation_idx = 0;
     state.spaceship.num_rendered_frames_per_animation_frame = 4;
     state.spaceship.rendered_frame_idx = 0;
+    state.spaceship.is_firing = false;
+    state.spaceship.time_till_next_shot_s = 0.0F;
 
     state.projectiles_count = 0;
 
@@ -232,7 +245,7 @@ void handle_event(const SDL_Event* const event)
             case SDLK_DOWN: state.spaceship.velocity.y += SPACESHIP_VELOCITY_PPS; break;
             case SDLK_LEFT: state.spaceship.velocity.x -= SPACESHIP_VELOCITY_PPS; break;
             case SDLK_RIGHT: state.spaceship.velocity.x += SPACESHIP_VELOCITY_PPS; break;
-            case SDLK_SPACE: spawn_projectile(); break;
+            case SDLK_SPACE: state.spaceship.is_firing = true; break;
         }
     }
     else if(event->type == SDL_KEYUP && event->key.repeat == 0) {
@@ -241,6 +254,10 @@ void handle_event(const SDL_Event* const event)
             case SDLK_DOWN: state.spaceship.velocity.y -= SPACESHIP_VELOCITY_PPS; break;
             case SDLK_LEFT: state.spaceship.velocity.x += SPACESHIP_VELOCITY_PPS; break;
             case SDLK_RIGHT: state.spaceship.velocity.x -= SPACESHIP_VELOCITY_PPS; break;
+            case SDLK_SPACE:
+                state.spaceship.is_firing = false;
+                state.spaceship.time_till_next_shot_s = 0.0F;
+                break;
         }
     }
 }
@@ -291,6 +308,17 @@ void update_state()
         state.spaceship.rendered_frame_idx = 0;
         ++state.spaceship.animation_idx;
         state.spaceship.animation_idx %= state.spaceship.num_animation_frames;
+    }
+
+    // If the ship is firing, and is ready to generate a new projectile, then do so now
+    if(state.spaceship.is_firing) {
+        if(state.spaceship.time_till_next_shot_s <= 0.0F) {
+            spawn_projectile();
+            state.spaceship.time_till_next_shot_s = 1.0F / SPACESHIP_FIRERATE_PPS;
+        }
+        else {
+            state.spaceship.time_till_next_shot_s -= time_delta_s;
+        }
     }
 
     // Update all projectile's positions and animations
