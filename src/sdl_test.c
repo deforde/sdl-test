@@ -400,7 +400,7 @@ int main(int argc, char* argv[])
             }
         }
 
-        // Updated game state
+        // Update game state
         update_state();
 
         // Render
