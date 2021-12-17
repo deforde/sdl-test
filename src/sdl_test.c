@@ -24,8 +24,13 @@
 #define MAX_NUM_PROJECTILES 1024
 #define PROJECTILE_VELOCITY_PPS 640
 
+#define MAX_NUM_ENEMIES 1024
+#define ENEMY_VELOCITY_PPS 160
+#define ENEMY_SPAWN_RATE_EPS 1
+
 const char* spaceship_img = "data/ship.png";
 const char* projectile_img = "data/laser-bolts.png";
+const char* small_enemy_img = "data/enemy-small.png";
 
 enum {
     SPACESHIP_STATIONARY_1,
@@ -47,8 +52,15 @@ enum {
     PROJECTILE_SPRITES_TOTAL
 };
 
+enum {
+    SMALL_ENEMY_1,
+    SMALL_ENEMY_2,
+    SMALL_ENEMY_SPRITES_TOTAL
+};
+
 SDL_Rect spaceship_sprite_quads[SPACESHIP_SPRITES_TOTAL];
 SDL_Rect projectile_sprite_quads[PROJECTILE_SPRITES_TOTAL];
+SDL_Rect small_enemy_sprite_quads[SMALL_ENEMY_SPRITES_TOTAL];
 
 typedef struct {
     int32_t x;
@@ -68,14 +80,15 @@ typedef struct {
     int32_t rendered_frame_idx;                         \
 }
 
-typedef struct ENTITY_STRUCT_BODY entity_t;
-
 typedef struct {
     struct ENTITY_STRUCT_BODY;
-
     bool is_firing;
     float time_till_next_shot_s;
 } spaceship_t;
+
+typedef struct ENTITY_STRUCT_BODY projectile_t;
+
+typedef struct ENTITY_STRUCT_BODY enemy_t;
 
 typedef struct {
     SDL_Window* window;
@@ -85,8 +98,13 @@ typedef struct {
     spaceship_t spaceship;
 
     SDL_Texture* projectile_texture;
-    entity_t projectiles[MAX_NUM_PROJECTILES];
-    size_t projectiles_count;
+    projectile_t projectiles[MAX_NUM_PROJECTILES];
+    size_t projectile_count;
+
+    SDL_Texture* small_enemy_texture;
+    enemy_t enemies[MAX_NUM_ENEMIES];
+    size_t enemy_count;
+    float time_till_next_enemy_spawn_s;
 } game_state_t;
 
 game_state_t state;
@@ -104,6 +122,7 @@ void render();
 SDL_Texture* load_texture(const char* const filename);
 
 void spawn_projectile();
+void spawn_enemy();
 
 // ============================================================================
 // Function implementations
@@ -161,11 +180,21 @@ void init()
     projectile_sprite_quads[PROJECTILE_2].w = 16;
     projectile_sprite_quads[PROJECTILE_2].h = 32;
 
+    small_enemy_sprite_quads[SMALL_ENEMY_1].x = 0;
+    small_enemy_sprite_quads[SMALL_ENEMY_1].y = 0;
+    small_enemy_sprite_quads[SMALL_ENEMY_1].w = 16;
+    small_enemy_sprite_quads[SMALL_ENEMY_1].h = 16;
+    small_enemy_sprite_quads[SMALL_ENEMY_2].x = 16;
+    small_enemy_sprite_quads[SMALL_ENEMY_2].y = 0;
+    small_enemy_sprite_quads[SMALL_ENEMY_2].w = 16;
+    small_enemy_sprite_quads[SMALL_ENEMY_2].h = 16;
+
     state.window = NULL;
     state.renderer = NULL;
 
     state.spaceship_texture = NULL;
     state.projectile_texture = NULL;
+    state.small_enemy_texture = NULL;
 
     state.spaceship.sprite_scaling = 2;
     state.spaceship.position.x = SCREEN_WIDTH / 2;
@@ -184,7 +213,9 @@ void init()
     state.spaceship.is_firing = false;
     state.spaceship.time_till_next_shot_s = 0.0F;
 
-    state.projectiles_count = 0;
+    state.projectile_count = 0;
+    state.enemy_count = 0;
+    state.time_till_next_enemy_spawn_s = 0.0F;
 
     if(SDL_Init(SDL_INIT_VIDEO) < 0) {
         fprintf(stderr, "SDL failed to initialise: %s\n", SDL_GetError());
@@ -216,10 +247,14 @@ void init()
 
     state.spaceship_texture = load_texture(spaceship_img);
     state.projectile_texture = load_texture(projectile_img);
+    state.small_enemy_texture = load_texture(small_enemy_img);
 }
 
 void destroy()
 {
+    SDL_DestroyTexture(state.small_enemy_texture);
+    state.small_enemy_texture = NULL;
+
     SDL_DestroyTexture(state.projectile_texture);
     state.projectile_texture = NULL;
 
@@ -322,8 +357,8 @@ void update_state()
     }
 
     // Update all projectile's positions and animations
-    for(size_t i = 0; i < state.projectiles_count; ++i) {
-        entity_t* projectile = &state.projectiles[i];
+    for(size_t i = 0; i < state.projectile_count; ++i) {
+        projectile_t* projectile = &state.projectiles[i];
         projectile->sprite_quad = &projectile_sprite_quads[PROJECTILE_1 + projectile->animation_idx];
 
         projectile->position.y += (int32_t)(projectile->velocity.y * time_delta_s);
@@ -337,10 +372,43 @@ void update_state()
         }
     }
     // Remove all projectiles that have exited the screen
-    for(size_t i = 0; i < state.projectiles_count;) {
+    for(size_t i = 0; i < state.projectile_count;) {
         if(state.projectiles[i].position.y < 0) {
-            state.projectiles[i] = state.projectiles[state.projectiles_count - 1];
-            state.projectiles_count--;
+            state.projectiles[i] = state.projectiles[state.projectile_count - 1];
+            state.projectile_count--;
+            continue;
+        }
+        ++i;
+    }
+
+    // If enough time has elapsed, spawn an enemy
+    if(state.time_till_next_enemy_spawn_s <= 0.0F) {
+        spawn_enemy();
+        state.time_till_next_enemy_spawn_s = 1.0F / ENEMY_SPAWN_RATE_EPS;
+    }
+    else {
+        state.time_till_next_enemy_spawn_s -= time_delta_s;
+    }
+    // Update all enemies' positions and animations
+    for(size_t i = 0; i < state.enemy_count; ++i) {
+        enemy_t* enemy = &state.enemies[i];
+        enemy->sprite_quad = &small_enemy_sprite_quads[SMALL_ENEMY_1 + enemy->animation_idx];
+
+        enemy->position.y += (int32_t)(enemy->velocity.y * time_delta_s);
+        enemy->render_quad.y = enemy->position.y - enemy->render_quad.h / 2;
+
+        ++enemy->rendered_frame_idx;
+        if(enemy->rendered_frame_idx == enemy->num_rendered_frames_per_animation_frame) {
+            enemy->rendered_frame_idx = 0;
+            ++enemy->animation_idx;
+            enemy->animation_idx %= enemy->num_animation_frames;
+        }
+    }
+    // Remove all enemies that have exited the screen
+    for(size_t i = 0; i < state.enemy_count;) {
+        if(state.enemies[i].position.y > SCREEN_HEIGHT) {
+            state.enemies[i] = state.enemies[state.enemy_count - 1];
+            state.enemy_count--;
             continue;
         }
         ++i;
@@ -352,10 +420,17 @@ void render()
     SDL_SetRenderDrawColor(state.renderer, 0x0, 0x0, 0x0, 0xFF);
     SDL_RenderClear(state.renderer);
 
+    // Render ship
     SDL_RenderCopy(state.renderer, state.spaceship_texture, state.spaceship.sprite_quad, &state.spaceship.render_quad);
-    for(size_t i = 0; i < state.projectiles_count; ++i) {
-        entity_t* projectile = &state.projectiles[i];
+    // Render projectiles
+    for(size_t i = 0; i < state.projectile_count; ++i) {
+        projectile_t* projectile = &state.projectiles[i];
         SDL_RenderCopy(state.renderer, state.projectile_texture, projectile->sprite_quad, &projectile->render_quad);
+    }
+    // Render enemies
+    for(size_t i = 0; i < state.enemy_count; ++i) {
+        enemy_t* enemy = &state.enemies[i];
+        SDL_RenderCopy(state.renderer, state.small_enemy_texture, enemy->sprite_quad, &enemy->render_quad);
     }
 
     SDL_RenderPresent(state.renderer);
@@ -382,8 +457,8 @@ SDL_Texture* load_texture(const char* const filename)
 
 void spawn_projectile()
 {
-    if(state.projectiles_count < MAX_NUM_PROJECTILES) {
-        entity_t* projectile = &state.projectiles[state.projectiles_count++];
+    if(state.projectile_count < MAX_NUM_PROJECTILES) {
+        projectile_t* projectile = &state.projectiles[state.projectile_count++];
 
         projectile->position.x = state.spaceship.position.x;
         projectile->position.y = state.spaceship.position.y + state.spaceship.render_quad.h / 2;
@@ -403,6 +478,32 @@ void spawn_projectile()
         projectile->animation_idx = 0;
         projectile->num_rendered_frames_per_animation_frame = 4;
         projectile->rendered_frame_idx = 0;
+    }
+}
+
+void spawn_enemy()
+{
+    if(state.enemy_count < MAX_NUM_ENEMIES) {
+        enemy_t* enemy = &state.enemies[state.enemy_count++];
+
+        enemy->position.x = SCREEN_WIDTH / 2;
+        enemy->position.y = 0;
+
+        enemy->velocity.x = 0;
+        enemy->velocity.y = ENEMY_VELOCITY_PPS;
+
+        enemy->sprite_quad = &small_enemy_sprite_quads[SMALL_ENEMY_1];
+        enemy->sprite_scaling = 2;
+
+        enemy->render_quad.w = enemy->sprite_quad->w * enemy->sprite_scaling;
+        enemy->render_quad.h = enemy->sprite_quad->h * enemy->sprite_scaling;
+        enemy->render_quad.x = enemy->position.x - enemy->render_quad.w / 2;
+        enemy->render_quad.y = enemy->position.y - enemy->render_quad.h / 2;
+
+        enemy->num_animation_frames = 2;
+        enemy->animation_idx = 0;
+        enemy->num_rendered_frames_per_animation_frame = 4;
+        enemy->rendered_frame_idx = 0;
     }
 }
 
