@@ -167,12 +167,12 @@ void init()
     state.spaceship_texture = NULL;
     state.projectile_texture = NULL;
 
+    state.spaceship.sprite_scaling = 2;
     state.spaceship.position.x = SCREEN_WIDTH / 2;
-    state.spaceship.position.y = SCREEN_HEIGHT / 2;
+    state.spaceship.position.y = SCREEN_HEIGHT - 1 - spaceship_sprite_quads[SPACESHIP_STATIONARY_1].h * state.spaceship.sprite_scaling / 2;
     state.spaceship.velocity.x = 0;
     state.spaceship.velocity.y = 0;
     state.spaceship.sprite_quad = NULL;
-    state.spaceship.sprite_scaling = 2;
     state.spaceship.render_quad.x = 0;
     state.spaceship.render_quad.y = 0;
     state.spaceship.render_quad.w = 0;
