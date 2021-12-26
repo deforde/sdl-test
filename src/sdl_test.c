@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
@@ -89,6 +90,7 @@ typedef struct ENTITY_STRUCT_BODY enemy_t;
 typedef struct {
     SDL_Window* window;
     SDL_Renderer* renderer;
+    bool game_over;
 
     SDL_Texture* spaceship_texture;
     spaceship_t spaceship;
@@ -119,6 +121,9 @@ SDL_Texture* load_texture(const char* const filename);
 
 void spawn_projectile();
 void spawn_enemy();
+
+bool check_collisions(const SDL_Rect* const a, const SDL_Rect* const b);
+bool is_contained(const vector_t* const p, const SDL_Rect* const r);
 
 // ============================================================================
 // Function implementations
@@ -187,6 +192,7 @@ void init()
 
     state.window = NULL;
     state.renderer = NULL;
+    state.game_over = false;
 
     state.spaceship_texture = NULL;
     state.projectile_texture = NULL;
@@ -244,6 +250,8 @@ void init()
     state.spaceship_texture = load_texture(spaceship_img);
     state.projectile_texture = load_texture(projectile_img);
     state.small_enemy_texture = load_texture(small_enemy_img);
+
+    srand(time(NULL));
 }
 
 void destroy()
@@ -409,6 +417,39 @@ void update_state()
         }
         ++i;
     }
+
+    // Check enemy and projectile collisions
+    for(size_t i = 0; i < state.projectile_count;) {
+        projectile_t* projectile = &state.projectiles[i];
+        bool collision_detected = false;
+
+        for(size_t j = 0; j < state.enemy_count; ++j) {
+            enemy_t* enemy = &state.enemies[j];
+
+            if(is_contained(&projectile->position, &enemy->render_quad)) {
+                state.enemies[j] = state.enemies[state.enemy_count - 1];
+                state.enemy_count--;
+                collision_detected = true;
+                break;
+            }
+        }
+
+        if(collision_detected) {
+            state.projectiles[i] = state.projectiles[state.projectile_count - 1];
+            state.projectile_count--;
+            continue;
+        }
+        ++i;
+    }
+
+    // Check enemy and spaceship collisions
+    for(size_t i = 0; i < state.enemy_count; ++i) {
+        enemy_t* enemy = &state.enemies[i];
+        if(check_collisions(&state.spaceship.render_quad, &enemy->render_quad)) {
+            state.game_over = true;
+            break;
+        }
+    }
 }
 
 void render()
@@ -482,17 +523,24 @@ void spawn_enemy()
     if(state.enemy_count < MAX_NUM_ENEMIES) {
         enemy_t* enemy = &state.enemies[state.enemy_count++];
 
-        enemy->position.x = SCREEN_WIDTH / 2;
-        enemy->position.y = 0;
-
-        enemy->velocity.x = 0;
-        enemy->velocity.y = ENEMY_VELOCITY_PPS;
-
         enemy->sprite_quad = &small_enemy_sprite_quads[SMALL_ENEMY_1];
         enemy->sprite_scaling = 2;
 
         enemy->render_quad.w = enemy->sprite_quad->w * enemy->sprite_scaling;
         enemy->render_quad.h = enemy->sprite_quad->h * enemy->sprite_scaling;
+
+        const int32_t min_x = enemy->render_quad.w / 2;
+        const int32_t max_x = SCREEN_WIDTH - enemy->render_quad.w / 2;
+
+        const int32_t random_var = rand();
+        const int32_t x_pos = min_x + (float)random_var / RAND_MAX * (max_x - min_x);
+
+        enemy->position.x = x_pos;
+        enemy->position.y = 0;
+
+        enemy->velocity.x = 0;
+        enemy->velocity.y = ENEMY_VELOCITY_PPS;
+
         enemy->render_quad.x = enemy->position.x - enemy->render_quad.w / 2;
         enemy->render_quad.y = enemy->position.y - enemy->render_quad.h / 2;
 
@@ -501,6 +549,36 @@ void spawn_enemy()
         enemy->num_rendered_frames_per_animation_frame = 4;
         enemy->rendered_frame_idx = 0;
     }
+}
+
+bool check_collisions(const SDL_Rect* const a, const SDL_Rect* const b)
+{
+    const vector_t a_top_l = {
+        .x = a->x,
+        .y = a->y
+    };
+    const vector_t a_bottom_l = {
+        .x = a->x,
+        .y = a->y + a->h
+    };
+    const vector_t a_top_r = {
+        .x = a->x + a->w,
+        .y = a->y
+    };
+    const vector_t a_bottom_r = {
+        .x = a->x + a->w,
+        .y = a->y + a->h
+    };
+
+    const bool collision_detected = is_contained(&a_top_l, b) || is_contained(&a_bottom_l, b) || is_contained(&a_top_r, b) || is_contained(&a_bottom_r, b);
+
+    return collision_detected;
+}
+
+bool is_contained(const vector_t* const p, const SDL_Rect* const r)
+{
+    const bool result = p->x >= r->x && p->x <= (r->x + r->w) && p->y >= r->y && p->y <= (r->y + r->h);
+    return result;
 }
 
 // ============================================================================
@@ -525,11 +603,13 @@ int main(int argc, char* argv[])
             }
         }
 
-        // Update game state
-        update_state();
+        if(!state.game_over) {
+            // Update game state
+            update_state();
 
-        // Render
-        render();
+            // Render
+            render();
+        }
     }
 
     destroy();
