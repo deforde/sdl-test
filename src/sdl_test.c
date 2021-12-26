@@ -25,9 +25,12 @@
 #define ENEMY_VELOCITY_PPS 160
 #define ENEMY_SPAWN_RATE_EPS 1
 
+#define MAX_NUM_EXPLOSIONS 1024
+
 const char* spaceship_img = "data/ship.png";
 const char* projectile_img = "data/laser-bolts.png";
 const char* small_enemy_img = "data/enemy-small.png";
+const char* explosion_img = "data/explosion.png";
 
 enum {
     SPACESHIP_STATIONARY_1,
@@ -55,9 +58,19 @@ enum {
     SMALL_ENEMY_SPRITES_TOTAL
 };
 
+enum {
+    EXPLOSION_1,
+    EXPLOSION_2,
+    EXPLOSION_3,
+    EXPLOSION_4,
+    EXPLOSION_5,
+    EXPLOSION_TOTAL
+};
+
 SDL_Rect spaceship_sprite_quads[SPACESHIP_SPRITES_TOTAL];
 SDL_Rect projectile_sprite_quads[PROJECTILE_SPRITES_TOTAL];
 SDL_Rect small_enemy_sprite_quads[SMALL_ENEMY_SPRITES_TOTAL];
+SDL_Rect explosion_sprite_quads[EXPLOSION_TOTAL];
 
 typedef struct {
     int32_t x;
@@ -84,8 +97,8 @@ typedef struct {
 } spaceship_t;
 
 typedef struct ENTITY_STRUCT_BODY projectile_t;
-
 typedef struct ENTITY_STRUCT_BODY enemy_t;
+typedef struct ENTITY_STRUCT_BODY explosion_t;
 
 typedef struct {
     SDL_Window* window;
@@ -103,6 +116,10 @@ typedef struct {
     enemy_t enemies[MAX_NUM_ENEMIES];
     size_t enemy_count;
     float time_till_next_enemy_spawn_s;
+
+    SDL_Texture* explosion_texture;
+    explosion_t explosions[MAX_NUM_EXPLOSIONS];
+    size_t explosions_count;
 } game_state_t;
 
 game_state_t state;
@@ -121,6 +138,7 @@ SDL_Texture* load_texture(const char* const filename);
 
 void spawn_projectile();
 void spawn_enemy();
+void spawn_explosion(vector_t p);
 
 bool check_collisions(const SDL_Rect* const a, const SDL_Rect* const b);
 bool is_contained(const vector_t* const p, const SDL_Rect* const r);
@@ -190,6 +208,27 @@ void init()
     small_enemy_sprite_quads[SMALL_ENEMY_2].w = 16;
     small_enemy_sprite_quads[SMALL_ENEMY_2].h = 16;
 
+    explosion_sprite_quads[EXPLOSION_1].x = 0;
+    explosion_sprite_quads[EXPLOSION_1].y = 0;
+    explosion_sprite_quads[EXPLOSION_1].w = 16;
+    explosion_sprite_quads[EXPLOSION_1].h = 16;
+    explosion_sprite_quads[EXPLOSION_2].x = 16;
+    explosion_sprite_quads[EXPLOSION_2].y = 0;
+    explosion_sprite_quads[EXPLOSION_2].w = 16;
+    explosion_sprite_quads[EXPLOSION_2].h = 16;
+    explosion_sprite_quads[EXPLOSION_3].x = 32;
+    explosion_sprite_quads[EXPLOSION_3].y = 0;
+    explosion_sprite_quads[EXPLOSION_3].w = 16;
+    explosion_sprite_quads[EXPLOSION_3].h = 16;
+    explosion_sprite_quads[EXPLOSION_4].x = 48;
+    explosion_sprite_quads[EXPLOSION_4].y = 0;
+    explosion_sprite_quads[EXPLOSION_4].w = 16;
+    explosion_sprite_quads[EXPLOSION_4].h = 16;
+    explosion_sprite_quads[EXPLOSION_5].x = 64;
+    explosion_sprite_quads[EXPLOSION_5].y = 0;
+    explosion_sprite_quads[EXPLOSION_5].w = 16;
+    explosion_sprite_quads[EXPLOSION_5].h = 16;
+
     state.window = NULL;
     state.renderer = NULL;
     state.game_over = false;
@@ -197,6 +236,7 @@ void init()
     state.spaceship_texture = NULL;
     state.projectile_texture = NULL;
     state.small_enemy_texture = NULL;
+    state.explosion_texture = NULL;
 
     state.spaceship.sprite_scaling = 2;
     state.spaceship.position.x = SCREEN_WIDTH / 2;
@@ -250,12 +290,16 @@ void init()
     state.spaceship_texture = load_texture(spaceship_img);
     state.projectile_texture = load_texture(projectile_img);
     state.small_enemy_texture = load_texture(small_enemy_img);
+    state.explosion_texture = load_texture(explosion_img);
 
     srand(time(NULL));
 }
 
 void destroy()
 {
+    SDL_DestroyTexture(state.explosion_texture);
+    state.explosion_texture = NULL;
+
     SDL_DestroyTexture(state.small_enemy_texture);
     state.small_enemy_texture = NULL;
 
@@ -418,6 +462,24 @@ void update_state()
         ++i;
     }
 
+    // Update all explosions animations and remove those that have completed
+    for(size_t i = 0; i < state.explosions_count;) {
+        explosion_t* explosion = &state.explosions[i];
+        explosion->sprite_quad = &explosion_sprite_quads[EXPLOSION_1 + explosion->animation_idx];
+
+        ++explosion->rendered_frame_idx;
+        if(explosion->rendered_frame_idx == explosion->num_rendered_frames_per_animation_frame) {
+            explosion->rendered_frame_idx = 0;
+            ++explosion->animation_idx;
+            if(explosion->animation_idx == explosion->num_animation_frames) {
+                state.explosions[i] = state.explosions[state.explosions_count - 1];
+                state.explosions_count--;
+                continue;
+            }
+        }
+        ++i;
+    }
+
     // Check enemy and projectile collisions
     for(size_t i = 0; i < state.projectile_count;) {
         projectile_t* projectile = &state.projectiles[i];
@@ -427,6 +489,7 @@ void update_state()
             enemy_t* enemy = &state.enemies[j];
 
             if(is_contained(&projectile->position, &enemy->render_quad)) {
+                spawn_explosion(enemy->position);
                 state.enemies[j] = state.enemies[state.enemy_count - 1];
                 state.enemy_count--;
                 collision_detected = true;
@@ -468,6 +531,11 @@ void render()
     for(size_t i = 0; i < state.enemy_count; ++i) {
         enemy_t* enemy = &state.enemies[i];
         SDL_RenderCopy(state.renderer, state.small_enemy_texture, enemy->sprite_quad, &enemy->render_quad);
+    }
+    // Render explosions
+    for(size_t i = 0; i < state.explosions_count; ++i) {
+        explosion_t* explosion = &state.explosions[i];
+        SDL_RenderCopy(state.renderer, state.explosion_texture, explosion->sprite_quad, &explosion->render_quad);
     }
 
     SDL_RenderPresent(state.renderer);
@@ -548,6 +616,31 @@ void spawn_enemy()
         enemy->animation_idx = 0;
         enemy->num_rendered_frames_per_animation_frame = 4;
         enemy->rendered_frame_idx = 0;
+    }
+}
+
+void spawn_explosion(vector_t p)
+{
+    if(state.explosions_count < MAX_NUM_EXPLOSIONS) {
+        explosion_t* explosion = &state.explosions[state.explosions_count++];
+
+        explosion->position = p;
+
+        explosion->velocity.x = 0;
+        explosion->velocity.y = 0;
+
+        explosion->sprite_quad = &explosion_sprite_quads[EXPLOSION_1];
+        explosion->sprite_scaling = 2;
+
+        explosion->render_quad.w = explosion->sprite_quad->w * explosion->sprite_scaling;
+        explosion->render_quad.h = explosion->sprite_quad->h * explosion->sprite_scaling;
+        explosion->render_quad.x = explosion->position.x - explosion->render_quad.w / 2;
+        explosion->render_quad.y = explosion->position.y - explosion->render_quad.h / 2;
+
+        explosion->num_animation_frames = 2;
+        explosion->animation_idx = 0;
+        explosion->num_rendered_frames_per_animation_frame = 4;
+        explosion->rendered_frame_idx = 0;
     }
 }
 
