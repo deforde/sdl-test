@@ -24,3 +24,9 @@ cmake --build . --target sdl-test
 ```
 apt install libsdl2-dev libsdl2-image-dev
 ```
+
+---------------------------------------------------
+
+### Assets
+
+- https://ansimuz.itch.io/spaceship-shooter-environment
