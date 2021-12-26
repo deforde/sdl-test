@@ -27,10 +27,10 @@
 
 #define MAX_NUM_EXPLOSIONS 1024
 
-const char* spaceship_img = "data/ship.png";
-const char* projectile_img = "data/laser-bolts.png";
-const char* small_enemy_img = "data/enemy-small.png";
-const char* explosion_img = "data/explosion.png";
+const char* spaceship_img = "../data/ship.png";
+const char* projectile_img = "../data/laser-bolts.png";
+const char* small_enemy_img = "../data/enemy-small.png";
+const char* explosion_img = "../data/explosion.png";
 
 enum {
     SPACESHIP_STATIONARY_1,
@@ -136,11 +136,16 @@ void render();
 
 SDL_Texture* load_texture(const char* const filename);
 
+void update_entity_positions(float time_delta_s);
+void spawn_entities(float time_delta_s);
+void update_entity_animations();
+void check_collisions();
+
 void spawn_projectile();
 void spawn_enemy();
 void spawn_explosion(vector_t p);
 
-bool check_collisions(const SDL_Rect* const a, const SDL_Rect* const b);
+bool is_collided(const SDL_Rect* const a, const SDL_Rect* const b);
 bool is_contained(const vector_t* const p, const SDL_Rect* const r);
 
 // ============================================================================
@@ -345,30 +350,8 @@ void handle_event(const SDL_Event* const event)
     }
 }
 
-void update_state()
+void update_entity_positions(float time_delta_s)
 {
-    // Get the time delta since the last update
-    const uint32_t current_time_ms = SDL_GetTicks();
-    static bool time_initialised = false;
-    static uint32_t last_update_time_ms = 0;
-    if(!time_initialised) {
-        last_update_time_ms = current_time_ms;
-        time_initialised = true;
-    }
-    const float time_delta_s = (current_time_ms - last_update_time_ms) / 1000.0F;
-    last_update_time_ms = current_time_ms;
-
-    // Select the correct spaceship sprite and set the rendering quad dimensions accordingly
-    state.spaceship.sprite_quad = &spaceship_sprite_quads[SPACESHIP_STATIONARY_1 + state.spaceship.animation_idx];
-    if(state.spaceship.velocity.x < 0) {
-        state.spaceship.sprite_quad = &spaceship_sprite_quads[SPACESHIP_BANK_HARD_LEFT_1 + state.spaceship.animation_idx];
-    }
-    else if(state.spaceship.velocity.x > 0) {
-        state.spaceship.sprite_quad = &spaceship_sprite_quads[SPACESHIP_BANK_HARD_RIGHT_1 + state.spaceship.animation_idx];
-    }
-    state.spaceship.render_quad.w = state.spaceship.sprite_quad->w * state.spaceship.sprite_scaling;
-    state.spaceship.render_quad.h = state.spaceship.sprite_quad->h * state.spaceship.sprite_scaling;
-
     // Update the spaceship's position
     state.spaceship.position.x += (int32_t)(state.spaceship.velocity.x * time_delta_s);
     state.spaceship.position.y += (int32_t)(state.spaceship.velocity.y * time_delta_s);
@@ -380,44 +363,15 @@ void update_state()
     state.spaceship.position.x = state.spaceship.position.x >= spaceship_max_x ? (spaceship_max_x - 1) : state.spaceship.position.x;
     state.spaceship.position.y = state.spaceship.position.y < spaceship_min_y ? spaceship_min_y : state.spaceship.position.y;
     state.spaceship.position.y = state.spaceship.position.y >= spaceship_max_y ? (spaceship_max_y - 1) : state.spaceship.position.y;
-
     // Update the spaceship's rendering quad origin
     state.spaceship.render_quad.x = state.spaceship.position.x - state.spaceship.render_quad.w / 2;
     state.spaceship.render_quad.y = state.spaceship.position.y - state.spaceship.render_quad.h / 2;
 
-    // Update the spaceship's animation indices as needed
-    ++state.spaceship.rendered_frame_idx;
-    if(state.spaceship.rendered_frame_idx == state.spaceship.num_rendered_frames_per_animation_frame) {
-        state.spaceship.rendered_frame_idx = 0;
-        ++state.spaceship.animation_idx;
-        state.spaceship.animation_idx %= state.spaceship.num_animation_frames;
-    }
-
-    // If the ship is firing, and is ready to generate a new projectile, then do so now
-    if(state.spaceship.is_firing) {
-        if(state.spaceship.time_till_next_shot_s <= 0.0F) {
-            spawn_projectile();
-            state.spaceship.time_till_next_shot_s = 1.0F / SPACESHIP_FIRERATE_PPS;
-        }
-        else {
-            state.spaceship.time_till_next_shot_s -= time_delta_s;
-        }
-    }
-
-    // Update all projectile's positions and animations
+    // Update all projectile's positions
     for(size_t i = 0; i < state.projectile_count; ++i) {
         projectile_t* projectile = &state.projectiles[i];
-        projectile->sprite_quad = &projectile_sprite_quads[PROJECTILE_1 + projectile->animation_idx];
-
         projectile->position.y += (int32_t)(projectile->velocity.y * time_delta_s);
         projectile->render_quad.y = projectile->position.y - projectile->render_quad.h / 2;
-
-        ++projectile->rendered_frame_idx;
-        if(projectile->rendered_frame_idx == projectile->num_rendered_frames_per_animation_frame) {
-            projectile->rendered_frame_idx = 0;
-            ++projectile->animation_idx;
-            projectile->animation_idx %= projectile->num_animation_frames;
-        }
     }
     // Remove all projectiles that have exited the screen
     for(size_t i = 0; i < state.projectile_count;) {
@@ -429,28 +383,11 @@ void update_state()
         ++i;
     }
 
-    // If enough time has elapsed, spawn an enemy
-    if(state.time_till_next_enemy_spawn_s <= 0.0F) {
-        spawn_enemy();
-        state.time_till_next_enemy_spawn_s = 1.0F / ENEMY_SPAWN_RATE_EPS;
-    }
-    else {
-        state.time_till_next_enemy_spawn_s -= time_delta_s;
-    }
-    // Update all enemies' positions and animations
+    // Update all enemies' positions
     for(size_t i = 0; i < state.enemy_count; ++i) {
         enemy_t* enemy = &state.enemies[i];
-        enemy->sprite_quad = &small_enemy_sprite_quads[SMALL_ENEMY_1 + enemy->animation_idx];
-
         enemy->position.y += (int32_t)(enemy->velocity.y * time_delta_s);
         enemy->render_quad.y = enemy->position.y - enemy->render_quad.h / 2;
-
-        ++enemy->rendered_frame_idx;
-        if(enemy->rendered_frame_idx == enemy->num_rendered_frames_per_animation_frame) {
-            enemy->rendered_frame_idx = 0;
-            ++enemy->animation_idx;
-            enemy->animation_idx %= enemy->num_animation_frames;
-        }
     }
     // Remove all enemies that have exited the screen
     for(size_t i = 0; i < state.enemy_count;) {
@@ -460,6 +397,76 @@ void update_state()
             continue;
         }
         ++i;
+    }
+}
+
+void spawn_entities(float time_delta_s)
+{
+    // If the ship is firing, and is ready to generate a new projectile, then do so now
+    if(state.spaceship.is_firing) {
+        if(state.spaceship.time_till_next_shot_s <= 0.0F) {
+            spawn_projectile();
+            state.spaceship.time_till_next_shot_s = 1.0F / SPACESHIP_FIRERATE_PPS;
+        }
+        else {
+            state.spaceship.time_till_next_shot_s -= time_delta_s;
+        }
+    }
+
+    // If enough time has elapsed, spawn an enemy
+    if(state.time_till_next_enemy_spawn_s <= 0.0F) {
+        spawn_enemy();
+        state.time_till_next_enemy_spawn_s = 1.0F / ENEMY_SPAWN_RATE_EPS;
+    }
+    else {
+        state.time_till_next_enemy_spawn_s -= time_delta_s;
+    }
+}
+
+void update_entity_animations()
+{
+    // Select the correct spaceship sprite and set the rendering quad dimensions accordingly
+    state.spaceship.sprite_quad = &spaceship_sprite_quads[SPACESHIP_STATIONARY_1 + state.spaceship.animation_idx];
+    if(state.spaceship.velocity.x < 0) {
+        state.spaceship.sprite_quad = &spaceship_sprite_quads[SPACESHIP_BANK_HARD_LEFT_1 + state.spaceship.animation_idx];
+    }
+    else if(state.spaceship.velocity.x > 0) {
+        state.spaceship.sprite_quad = &spaceship_sprite_quads[SPACESHIP_BANK_HARD_RIGHT_1 + state.spaceship.animation_idx];
+    }
+    state.spaceship.render_quad.w = state.spaceship.sprite_quad->w * state.spaceship.sprite_scaling;
+    state.spaceship.render_quad.h = state.spaceship.sprite_quad->h * state.spaceship.sprite_scaling;
+    // Update the spaceship's animation indices as needed
+    ++state.spaceship.rendered_frame_idx;
+    if(state.spaceship.rendered_frame_idx == state.spaceship.num_rendered_frames_per_animation_frame) {
+        state.spaceship.rendered_frame_idx = 0;
+        ++state.spaceship.animation_idx;
+        state.spaceship.animation_idx %= state.spaceship.num_animation_frames;
+    }
+
+    // Update all projectile's animations
+    for(size_t i = 0; i < state.projectile_count; ++i) {
+        projectile_t* projectile = &state.projectiles[i];
+        projectile->sprite_quad = &projectile_sprite_quads[PROJECTILE_1 + projectile->animation_idx];
+
+        ++projectile->rendered_frame_idx;
+        if(projectile->rendered_frame_idx == projectile->num_rendered_frames_per_animation_frame) {
+            projectile->rendered_frame_idx = 0;
+            ++projectile->animation_idx;
+            projectile->animation_idx %= projectile->num_animation_frames;
+        }
+    }
+
+    // Update all enemies' animations
+    for(size_t i = 0; i < state.enemy_count; ++i) {
+        enemy_t* enemy = &state.enemies[i];
+        enemy->sprite_quad = &small_enemy_sprite_quads[SMALL_ENEMY_1 + enemy->animation_idx];
+
+        ++enemy->rendered_frame_idx;
+        if(enemy->rendered_frame_idx == enemy->num_rendered_frames_per_animation_frame) {
+            enemy->rendered_frame_idx = 0;
+            ++enemy->animation_idx;
+            enemy->animation_idx %= enemy->num_animation_frames;
+        }
     }
 
     // Update all explosions animations and remove those that have completed
@@ -479,7 +486,10 @@ void update_state()
         }
         ++i;
     }
+}
 
+void check_collisions()
+{
     // Check enemy and projectile collisions
     for(size_t i = 0; i < state.projectile_count;) {
         projectile_t* projectile = &state.projectiles[i];
@@ -508,10 +518,38 @@ void update_state()
     // Check enemy and spaceship collisions
     for(size_t i = 0; i < state.enemy_count; ++i) {
         enemy_t* enemy = &state.enemies[i];
-        if(check_collisions(&state.spaceship.render_quad, &enemy->render_quad)) {
+        if(is_collided(&state.spaceship.render_quad, &enemy->render_quad)) {
+            spawn_explosion(state.spaceship.position);
             state.game_over = true;
             break;
         }
+    }
+}
+
+void update_state()
+{
+    // Get the time delta since the last update
+    const uint32_t current_time_ms = SDL_GetTicks();
+    static bool time_initialised = false;
+    static uint32_t last_update_time_ms = 0;
+    if(!time_initialised) {
+        last_update_time_ms = current_time_ms;
+        time_initialised = true;
+    }
+    const float time_delta_s = (current_time_ms - last_update_time_ms) / 1000.0F;
+    last_update_time_ms = current_time_ms;
+
+    if(!state.game_over) {
+        update_entity_positions(time_delta_s);
+
+        update_entity_animations();
+
+        spawn_entities(time_delta_s);
+
+        check_collisions();
+    }
+    else {
+        update_entity_animations();
     }
 }
 
@@ -520,8 +558,10 @@ void render()
     SDL_SetRenderDrawColor(state.renderer, 0x0, 0x0, 0x0, 0xFF);
     SDL_RenderClear(state.renderer);
 
-    // Render ship
-    SDL_RenderCopy(state.renderer, state.spaceship_texture, state.spaceship.sprite_quad, &state.spaceship.render_quad);
+    if(!state.game_over) {
+        // Render ship
+        SDL_RenderCopy(state.renderer, state.spaceship_texture, state.spaceship.sprite_quad, &state.spaceship.render_quad);
+    }
     // Render projectiles
     for(size_t i = 0; i < state.projectile_count; ++i) {
         projectile_t* projectile = &state.projectiles[i];
@@ -644,7 +684,7 @@ void spawn_explosion(vector_t p)
     }
 }
 
-bool check_collisions(const SDL_Rect* const a, const SDL_Rect* const b)
+bool is_collided(const SDL_Rect* const a, const SDL_Rect* const b)
 {
     const vector_t a_top_l = {
         .x = a->x,
@@ -696,13 +736,11 @@ int main(int argc, char* argv[])
             }
         }
 
-        if(!state.game_over) {
-            // Update game state
-            update_state();
+        // Update game state
+        update_state();
 
-            // Render
-            render();
-        }
+        // Render
+        render();
     }
 
     destroy();
