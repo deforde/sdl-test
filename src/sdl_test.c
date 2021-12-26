@@ -12,8 +12,8 @@
 // Global definitions
 // ============================================================================
 
-#define SCREEN_WIDTH 800
-#define SCREEN_HEIGHT 600
+#define SCREEN_WIDTH 600
+#define SCREEN_HEIGHT 800
 
 #define SPACESHIP_VELOCITY_PPS 320
 #define SPACESHIP_FIRERATE_PPS 3
@@ -31,6 +31,7 @@ const char* spaceship_img = "../data/ship.png";
 const char* projectile_img = "../data/laser-bolts.png";
 const char* small_enemy_img = "../data/enemy-small.png";
 const char* explosion_img = "../data/explosion.png";
+const char* background_img = "../data/desert-background-looped.png";
 
 enum {
     SPACESHIP_STATIONARY_1,
@@ -71,6 +72,7 @@ SDL_Rect spaceship_sprite_quads[SPACESHIP_SPRITES_TOTAL];
 SDL_Rect projectile_sprite_quads[PROJECTILE_SPRITES_TOTAL];
 SDL_Rect small_enemy_sprite_quads[SMALL_ENEMY_SPRITES_TOTAL];
 SDL_Rect explosion_sprite_quads[EXPLOSION_TOTAL];
+SDL_Rect background_sprite_quad;
 
 typedef struct {
     int32_t x;
@@ -105,6 +107,8 @@ typedef struct {
     SDL_Renderer* renderer;
     bool game_over;
 
+    SDL_Texture* background_texture;
+
     SDL_Texture* spaceship_texture;
     spaceship_t spaceship;
 
@@ -136,6 +140,7 @@ void render();
 
 SDL_Texture* load_texture(const char* const filename);
 
+void update_background();
 void update_entity_positions(float time_delta_s);
 void spawn_entities(float time_delta_s);
 void update_entity_animations();
@@ -154,6 +159,11 @@ bool is_contained(const vector_t* const p, const SDL_Rect* const r);
 
 void init()
 {
+    background_sprite_quad.x = 0;
+    background_sprite_quad.y = 266;
+    background_sprite_quad.w = 256;
+    background_sprite_quad.h = 304;
+
     spaceship_sprite_quads[SPACESHIP_BANK_HARD_LEFT_1].x = 0;
     spaceship_sprite_quads[SPACESHIP_BANK_HARD_LEFT_1].y = 0;
     spaceship_sprite_quads[SPACESHIP_BANK_HARD_LEFT_1].w = 16;
@@ -238,6 +248,7 @@ void init()
     state.renderer = NULL;
     state.game_over = false;
 
+    state.background_texture = NULL;
     state.spaceship_texture = NULL;
     state.projectile_texture = NULL;
     state.small_enemy_texture = NULL;
@@ -292,6 +303,7 @@ void init()
         exit(EXIT_FAILURE);
     }
 
+    state.background_texture = load_texture(background_img);
     state.spaceship_texture = load_texture(spaceship_img);
     state.projectile_texture = load_texture(projectile_img);
     state.small_enemy_texture = load_texture(small_enemy_img);
@@ -313,6 +325,9 @@ void destroy()
 
     SDL_DestroyTexture(state.spaceship_texture);
     state.spaceship_texture = NULL;
+
+    SDL_DestroyTexture(state.background_texture);
+    state.background_texture = NULL;
 
     SDL_DestroyRenderer(state.renderer);
     state.renderer = NULL;
@@ -526,6 +541,25 @@ void check_collisions()
     }
 }
 
+void update_background()
+{
+    const uint32_t frames_per_scroll = 4;
+    static uint32_t frame_counter = 0;
+
+    frame_counter++;
+    if(frame_counter != frames_per_scroll) {
+        return;
+    }
+    frame_counter = 0;
+
+    if(background_sprite_quad.y != 0) {
+        background_sprite_quad.y -= 1;
+    }
+    else {
+        background_sprite_quad.y = 304;
+    }
+}
+
 void update_state()
 {
     // Get the time delta since the last update
@@ -542,6 +576,8 @@ void update_state()
     update_entity_animations();
 
     if(!state.game_over) {
+        update_background();
+
         update_entity_positions(time_delta_s);
 
         update_entity_animations();
@@ -557,6 +593,13 @@ void render()
     SDL_SetRenderDrawColor(state.renderer, 0x0, 0x0, 0x0, 0xFF);
     SDL_RenderClear(state.renderer);
 
+    // Render background
+    SDL_Rect background_render_quad;
+    background_render_quad.x = 0;
+    background_render_quad.y = 0;
+    background_render_quad.w = SCREEN_WIDTH;
+    background_render_quad.h = SCREEN_HEIGHT;
+    SDL_RenderCopy(state.renderer, state.background_texture, &background_sprite_quad, &background_render_quad);
     if(!state.game_over) {
         // Render ship
         SDL_RenderCopy(state.renderer, state.spaceship_texture, state.spaceship.sprite_quad, &state.spaceship.render_quad);
