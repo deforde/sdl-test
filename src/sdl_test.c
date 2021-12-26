@@ -539,6 +539,8 @@ void update_state()
     const float time_delta_s = (current_time_ms - last_update_time_ms) / 1000.0F;
     last_update_time_ms = current_time_ms;
 
+    update_entity_animations();
+
     if(!state.game_over) {
         update_entity_positions(time_delta_s);
 
@@ -547,9 +549,6 @@ void update_state()
         spawn_entities(time_delta_s);
 
         check_collisions();
-    }
-    else {
-        update_entity_animations();
     }
 }
 
