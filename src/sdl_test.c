@@ -5,8 +5,17 @@
 #include <stdlib.h>
 #include <time.h>
 
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
+#include <SDL.h>
+#include <SDL_error.h>
+#include <SDL_events.h>
+#include <SDL_image.h>
+#include <SDL_keyboard.h>
+#include <SDL_keycode.h>
+#include <SDL_rect.h>
+#include <SDL_render.h>
+#include <SDL_surface.h>
+#include <SDL_timer.h>
+#include <SDL_video.h>
 
 // ============================================================================
 // Global definitions
