@@ -352,43 +352,45 @@ void destroy()
 void handle_event(const SDL_Event* const event)
 {
     // Set the spaceship's velocity
-    if(event->type == SDL_KEYDOWN && event->key.repeat == 0) {
-        switch(event->key.keysym.sym) {
-        case SDLK_UP:
-            state.spaceship.velocity.y -= SPACESHIP_VELOCITY_PPS;
-            break;
-        case SDLK_DOWN:
-            state.spaceship.velocity.y += SPACESHIP_VELOCITY_PPS;
-            break;
-        case SDLK_LEFT:
-            state.spaceship.velocity.x -= SPACESHIP_VELOCITY_PPS;
-            break;
-        case SDLK_RIGHT:
-            state.spaceship.velocity.x += SPACESHIP_VELOCITY_PPS;
-            break;
-        case SDLK_SPACE:
-            state.spaceship.is_firing = true;
-            break;
+    if(event->key.repeat == 0) {
+        if(event->type == SDL_KEYDOWN) {
+            switch(event->key.keysym.sym) {
+            case SDLK_UP:
+                state.spaceship.velocity.y -= SPACESHIP_VELOCITY_PPS;
+                break;
+            case SDLK_DOWN:
+                state.spaceship.velocity.y += SPACESHIP_VELOCITY_PPS;
+                break;
+            case SDLK_LEFT:
+                state.spaceship.velocity.x -= SPACESHIP_VELOCITY_PPS;
+                break;
+            case SDLK_RIGHT:
+                state.spaceship.velocity.x += SPACESHIP_VELOCITY_PPS;
+                break;
+            case SDLK_SPACE:
+                state.spaceship.is_firing = true;
+                break;
+            }
         }
-    }
-    else if(event->type == SDL_KEYUP && event->key.repeat == 0) {
-        switch(event->key.keysym.sym) {
-        case SDLK_UP:
-            state.spaceship.velocity.y += SPACESHIP_VELOCITY_PPS;
-            break;
-        case SDLK_DOWN:
-            state.spaceship.velocity.y -= SPACESHIP_VELOCITY_PPS;
-            break;
-        case SDLK_LEFT:
-            state.spaceship.velocity.x += SPACESHIP_VELOCITY_PPS;
-            break;
-        case SDLK_RIGHT:
-            state.spaceship.velocity.x -= SPACESHIP_VELOCITY_PPS;
-            break;
-        case SDLK_SPACE:
-            state.spaceship.is_firing = false;
-            state.spaceship.time_till_next_shot_s = 0.0F;
-            break;
+        else if(event->type == SDL_KEYUP) {
+            switch(event->key.keysym.sym) {
+            case SDLK_UP:
+                state.spaceship.velocity.y += SPACESHIP_VELOCITY_PPS;
+                break;
+            case SDLK_DOWN:
+                state.spaceship.velocity.y -= SPACESHIP_VELOCITY_PPS;
+                break;
+            case SDLK_LEFT:
+                state.spaceship.velocity.x += SPACESHIP_VELOCITY_PPS;
+                break;
+            case SDLK_RIGHT:
+                state.spaceship.velocity.x -= SPACESHIP_VELOCITY_PPS;
+                break;
+            case SDLK_SPACE:
+                state.spaceship.is_firing = false;
+                state.spaceship.time_till_next_shot_s = 0.0F;
+                break;
+            }
         }
     }
 }
@@ -711,7 +713,7 @@ void spawn_enemy()
         const int32_t max_x = SCREEN_WIDTH - enemy->render_quad.w / 2;
 
         const int32_t random_var = rand();
-        const int32_t x_pos = min_x + (int32_t)((float)random_var / (float)(RAND_MAX * (max_x - min_x)));
+        const int32_t x_pos = min_x + (float)random_var / RAND_MAX * (max_x - min_x);
 
         enemy->position.x = x_pos;
         enemy->position.y = 0;
