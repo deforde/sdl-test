@@ -84,7 +84,7 @@ typedef struct {
     vector_t position;                               \
     vector_t velocity;                               \
     SDL_Rect* sprite_quad;                           \
-    uint32_t sprite_scaling;                         \
+    int32_t sprite_scaling;                          \
     SDL_Rect render_quad;                            \
     int32_t num_animation_frames;                    \
     int32_t animation_idx;                           \
@@ -135,10 +135,10 @@ game_state_t state;
 void init();
 void destroy();
 void update_state();
-void handle_event(const SDL_Event* const event);
+void handle_event(const SDL_Event* event);
 void render();
 
-SDL_Texture* load_texture(const char* const filename);
+SDL_Texture* load_texture(const char* filename);
 
 void update_background();
 void update_entity_positions(float time_delta_s);
@@ -150,8 +150,8 @@ void spawn_projectile();
 void spawn_enemy();
 void spawn_explosion(vector_t p);
 
-bool is_collided(const SDL_Rect* const a, const SDL_Rect* const b);
-bool is_contained(const vector_t* const p, const SDL_Rect* const r);
+bool is_collided(const SDL_Rect* a, const SDL_Rect* b);
+bool is_contained(const vector_t* p, const SDL_Rect* r);
 
 // ============================================================================
 // Function implementations
@@ -589,7 +589,7 @@ void update_state()
         last_update_time_ms = current_time_ms;
         time_initialised = true;
     }
-    const float time_delta_s = (current_time_ms - last_update_time_ms) / 1000.0F;
+    const float time_delta_s = (float)(current_time_ms - last_update_time_ms) / 1000.0F;
     last_update_time_ms = current_time_ms;
 
     update_entity_animations();
@@ -702,7 +702,7 @@ void spawn_enemy()
         const int32_t max_x = SCREEN_WIDTH - enemy->render_quad.w / 2;
 
         const int32_t random_var = rand();
-        const int32_t x_pos = min_x + (float)random_var / RAND_MAX * (max_x - min_x);
+        const int32_t x_pos = min_x + (int32_t)((float)random_var / (float)(RAND_MAX * (max_x - min_x)));
 
         enemy->position.x = x_pos;
         enemy->position.y = 0;
@@ -779,7 +779,7 @@ bool is_contained(const vector_t* const p, const SDL_Rect* const r)
 // Main entry point
 // ============================================================================
 
-int main(int argc, char* argv[])
+int main()
 {
     init();
 
