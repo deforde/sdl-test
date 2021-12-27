@@ -1,5 +1,5 @@
-# sdl-test
-Playing with [SDL](https://www.libsdl.org/).
+# shmupsy
+A simple shoot 'em up game, used as a means to experiment with [SDL](https://www.libsdl.org/).
 
 ---------------------------------------------------
 
@@ -8,9 +8,9 @@ Playing with [SDL](https://www.libsdl.org/).
 The current build configuration is intended to target Linux only (for now).
 ```
 git clone https://github.com/deforde/sdl-test
-cd sdl-test && mkdir build && cd build
+cd shmupsy && mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
-cmake --build . --target sdl-test
+cmake --build . --target shmupsy
 ```
 
 ---------------------------------------------------
