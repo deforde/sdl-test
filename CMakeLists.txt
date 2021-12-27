@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.13)
-project(sdl-test C)
+project(shmupsy C)
 
 add_compile_options(-Wall -Wextra -pedantic -Werror -Werror=vla)
 
-add_executable(sdl-test "")
+add_executable(shmupsy "")
 
 include_directories(/usr/include/SDL2)
 
 add_subdirectory(src)
 
-target_link_libraries(sdl-test SDL2 SDL2_image)
+target_link_libraries(shmupsy SDL2 SDL2_image)

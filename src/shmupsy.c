@@ -290,7 +290,7 @@ void init()
     }
 
     state.window = SDL_CreateWindow(
-        "sdl-test",
+        "shmupsy",
         SDL_WINDOWPOS_UNDEFINED,
         SDL_WINDOWPOS_UNDEFINED,
         SCREEN_WIDTH,

@@ -1,4 +1,4 @@
-target_sources(sdl-test
+target_sources(shmupsy
 PRIVATE
-    sdl_test.c
+    shmupsy.c
 )
