@@ -79,17 +79,17 @@ typedef struct {
     int32_t y;
 } vector_t;
 
-#define ENTITY_STRUCT_BODY                              \
-{                                                       \
-    vector_t position;                                  \
-    vector_t velocity;                                  \
-    SDL_Rect* sprite_quad;                              \
-    uint32_t sprite_scaling;                            \
-    SDL_Rect render_quad;                               \
-    int32_t num_animation_frames;                       \
-    int32_t animation_idx;                              \
-    int32_t num_rendered_frames_per_animation_frame;    \
-    int32_t rendered_frame_idx;                         \
+#define ENTITY_STRUCT_BODY                           \
+{                                                    \
+    vector_t position;                               \
+    vector_t velocity;                               \
+    SDL_Rect* sprite_quad;                           \
+    uint32_t sprite_scaling;                         \
+    SDL_Rect render_quad;                            \
+    int32_t num_animation_frames;                    \
+    int32_t animation_idx;                           \
+    int32_t num_rendered_frames_per_animation_frame; \
+    int32_t rendered_frame_idx;                      \
 }
 
 typedef struct {
@@ -282,10 +282,11 @@ void init()
 
     state.window = SDL_CreateWindow(
         "sdl-test",
-        SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-        SCREEN_WIDTH, SCREEN_HEIGHT,
-        SDL_WINDOW_SHOWN
-    );
+        SDL_WINDOWPOS_UNDEFINED,
+        SDL_WINDOWPOS_UNDEFINED,
+        SCREEN_WIDTH,
+        SCREEN_HEIGHT,
+        SDL_WINDOW_SHOWN);
     if(state.window == NULL) {
         fprintf(stderr, "SDL window could not be created: %s\n", SDL_GetError());
         exit(EXIT_FAILURE);
@@ -344,23 +345,41 @@ void handle_event(const SDL_Event* const event)
     // Set the spaceship's velocity
     if(event->type == SDL_KEYDOWN && event->key.repeat == 0) {
         switch(event->key.keysym.sym) {
-            case SDLK_UP: state.spaceship.velocity.y -= SPACESHIP_VELOCITY_PPS; break;
-            case SDLK_DOWN: state.spaceship.velocity.y += SPACESHIP_VELOCITY_PPS; break;
-            case SDLK_LEFT: state.spaceship.velocity.x -= SPACESHIP_VELOCITY_PPS; break;
-            case SDLK_RIGHT: state.spaceship.velocity.x += SPACESHIP_VELOCITY_PPS; break;
-            case SDLK_SPACE: state.spaceship.is_firing = true; break;
+        case SDLK_UP:
+            state.spaceship.velocity.y -= SPACESHIP_VELOCITY_PPS;
+            break;
+        case SDLK_DOWN:
+            state.spaceship.velocity.y += SPACESHIP_VELOCITY_PPS;
+            break;
+        case SDLK_LEFT:
+            state.spaceship.velocity.x -= SPACESHIP_VELOCITY_PPS;
+            break;
+        case SDLK_RIGHT:
+            state.spaceship.velocity.x += SPACESHIP_VELOCITY_PPS;
+            break;
+        case SDLK_SPACE:
+            state.spaceship.is_firing = true;
+            break;
         }
     }
     else if(event->type == SDL_KEYUP && event->key.repeat == 0) {
         switch(event->key.keysym.sym) {
-            case SDLK_UP: state.spaceship.velocity.y += SPACESHIP_VELOCITY_PPS; break;
-            case SDLK_DOWN: state.spaceship.velocity.y -= SPACESHIP_VELOCITY_PPS; break;
-            case SDLK_LEFT: state.spaceship.velocity.x += SPACESHIP_VELOCITY_PPS; break;
-            case SDLK_RIGHT: state.spaceship.velocity.x -= SPACESHIP_VELOCITY_PPS; break;
-            case SDLK_SPACE:
-                state.spaceship.is_firing = false;
-                state.spaceship.time_till_next_shot_s = 0.0F;
-                break;
+        case SDLK_UP:
+            state.spaceship.velocity.y += SPACESHIP_VELOCITY_PPS;
+            break;
+        case SDLK_DOWN:
+            state.spaceship.velocity.y -= SPACESHIP_VELOCITY_PPS;
+            break;
+        case SDLK_LEFT:
+            state.spaceship.velocity.x += SPACESHIP_VELOCITY_PPS;
+            break;
+        case SDLK_RIGHT:
+            state.spaceship.velocity.x -= SPACESHIP_VELOCITY_PPS;
+            break;
+        case SDLK_SPACE:
+            state.spaceship.is_firing = false;
+            state.spaceship.time_till_next_shot_s = 0.0F;
+            break;
         }
     }
 }
