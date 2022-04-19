@@ -7,7 +7,7 @@ A simple shoot 'em up game, used as a means to experiment with [SDL](https://www
 
 The current build configuration is intended to target Linux only (for now).
 ```
-git clone https://github.com/deforde/sdl-test
+git clone https://github.com/deforde/shmupsy
 cd shmupsy && mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . --target shmupsy
